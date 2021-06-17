@@ -1,3 +1,6 @@
 .vscode
 dataset/
 result/
+submission/
+weight/
+__pycache__
