@@ -119,6 +119,7 @@ class Model():
             self.run_one_epoch(train_dataloader, ep_now, True)
             with torch.no_grad():
                 self.run_one_epoch(valid_dataloader, ep_now, False)
+            self.save(flag=str(ep_now))
             print('---')
         return
 
@@ -138,12 +139,14 @@ class Model():
 
         # get results
         results = []
+        file_names = []
         with torch.no_grad():
-            for _, X_batch in enumerate(tqdm(dataloader)):
+            for _, (X_batch, file_name_batch) in enumerate(tqdm(dataloader)):
                 X_batch = X_batch.to(self.device)
                 s_out, t_out = self.net(X_batch)
                 _, pred = torch.max(s_out.data, 1)
                 results.extend(pred.detach().cpu().tolist())
+                file_names.extend(file_name_batch)
 
         # write result into csv
         with open('./submission/%s.csv' % file_name, 'w', newline='') as csv_file:
@@ -155,9 +158,10 @@ class Model():
 
     def save(
         self,
-        file_name: str
+        file_name: str = './weight/tmp',
+        flag: str = ''
     ) -> None:
-        torch.save(self.net, file_name)
+        torch.save(self.net, file_name + flag + '.pt')
         return
 
     def load(
@@ -175,7 +179,7 @@ def main():
     parser.add_argument("--submission", type=str, default='submission')
     parser.add_argument("--load", type=bool, default=False)
     parser.add_argument("--valid_ratio", type=float, default=0.2)
-    parser.add_argument("--epoch", type=int, default=100)
+    parser.add_argument("--epoch", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=20)
     parser.add_argument("--leanring_rate", type=float, default=1e-4)
     args = parser.parse_args()
@@ -207,6 +211,7 @@ def main():
         batch_size=args.batch_size,
         leanring_rate=args.leanring_rate
     )
+    model.save()
 
     # test
     model.test(

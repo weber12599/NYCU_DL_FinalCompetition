@@ -14,11 +14,13 @@ class AudioDataset(Dataset):
         self,
         mel_specs: list,
         scenarios: list or None,
-        transcriptions: list or None
+        transcriptions: list or None,
+        file_names: list
     ) -> None:
         self.mel_specs = mel_specs
         self.scenarios = scenarios
         self.transcriptions = transcriptions
+        self.file_names = file_names
         return
 
     def __len__(
@@ -31,9 +33,9 @@ class AudioDataset(Dataset):
         index: int
     ) -> (torch.Tensor, torch.Tensor or None, torch.Tensor or None):
         if self.scenarios is not None and self.transcriptions is not None:
-            return (self.mel_specs[index], self.scenarios[index], self.transcriptions[index])
+            return (self.mel_specs[index], self.scenarios[index], self.transcriptions[index], self.file_names[index])
         else:
-            return (self.mel_specs[index], None, None)
+            return (self.mel_specs[index], None, None, self.file_names[index])
 
 
 class Data():
@@ -63,18 +65,22 @@ class Data():
                 self.train = AudioDataset(
                     mel_specs=self.get_mel_spec(file_names[:train_end_idx], split),
                     scenarios=self.get_scenario(file_names[:train_end_idx]),
-                    transcriptions=self.get_transciption(file_names[:train_end_idx])
+                    transcriptions=self.get_transciption(file_names[:train_end_idx]),
+                    file_names=file_names[:train_end_idx]
                 )
                 self.valid = AudioDataset(
                     mel_specs=self.get_mel_spec(file_names[train_end_idx:], split),
                     scenarios=self.get_scenario(file_names[train_end_idx:]),
-                    transcriptions=self.get_transciption(file_names[train_end_idx:])
+                    transcriptions=self.get_transciption(file_names[train_end_idx:]),
+                    file_names=file_names[train_end_idx:]
                 )
             elif split == 'test':
+                file_names.sort()
                 self.test = AudioDataset(
                     mel_specs=self.get_mel_spec(file_names, split),
                     scenarios=None,
-                    transcriptions=None
+                    transcriptions=None,
+                    file_names=file_names
                 )
             else:
                 raise NotImplementedError
@@ -88,7 +94,7 @@ class Data():
             '%s/train.csv' % self.dataset_dir,
             dtype={'file': str, 'scenario': str, 'sentence': str}
         ).values.tolist()
-        scenario_set = list(set([label[1] for label in labels]))
+        scenario_set = ['email', 'play', 'lists', 'qa', 'weather', 'iot', 'audio', 'calendar', 'alarm', 'general']
         print('num_label:', len(scenario_set))
         self.num_label = len(scenario_set)
         for label in labels:
@@ -153,7 +159,7 @@ def train_data_processing(
     input_lengths = []
     label_lengths = []
 
-    for (mel_spec, scenario, transcription) in data:
+    for (mel_spec, scenario, transcription, _) in data:
         mel_specs.append(mel_spec)
         scenarios.append(scenario)
         transcriptions.append(transcription)
@@ -169,9 +175,10 @@ def train_data_processing(
 def test_data_processing(
     data: list
 ) -> None:
-    mel_specs = [mel_spec for (mel_spec, _, _) in data]
+    mel_specs = [mel_spec for (mel_spec, _, _, _) in data]
+    file_names = [file_name for (_, _, _, file_name) in data]
     mel_specs = nn.utils.rnn.pad_sequence(mel_specs, batch_first=True).unsqueeze(1).transpose(2, 3)
-    return mel_specs
+    return mel_specs, file_names
 
 
 def main():
